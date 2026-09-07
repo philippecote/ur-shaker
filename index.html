@@ -1050,32 +1050,7 @@
             } catch (_) {}
           }
 
-          // 1. Shaker rattle friction bed (textured noise sliding over tray)
-          if (this.noiseBuffer) {
-            const src = this.ctx.createBufferSource();
-            src.buffer = this.noiseBuffer;
-            src.loop = true;
-
-            const band = this.ctx.createBiquadFilter();
-            band.type = 'bandpass';
-            band.frequency.setValueAtTime(1250, start);
-            band.frequency.exponentialRampToValueAtTime(650, start + dur * 0.85);
-            band.Q.setValueAtTime(1.8, start);
-
-            const gain = this.ctx.createGain();
-            gain.gain.setValueAtTime(0.001, start);
-            gain.gain.linearRampToValueAtTime(0.38, start + 0.06);
-            gain.gain.exponentialRampToValueAtTime(0.001, start + dur * 0.88);
-
-            src.connect(band);
-            band.connect(gain);
-            gain.connect(this.masterGain);
-
-            src.start(start);
-            src.stop(start + dur * 0.9);
-          }
-
-          // 2. Cascade of 20 to 26 micro-clatters (tapering off)
+          // Cascade of individual micro-clatters (tumble impacts)
           const hits = 22 + Math.floor(Math.random() * 6);
           for (let i = 0; i < hits; i++) {
             const progress = Math.pow(i / hits, 1.55);
@@ -1085,7 +1060,7 @@
             this.scheduleSubImpact(timeOffset, vol, pan);
           }
 
-          // 3. Crisp final settling clatters
+          // Crisp final settling clatters
           this.scheduleSubImpact(start + dur * 0.80 + Math.random() * 0.03, 0.45, -0.3);
           this.scheduleSubImpact(start + dur * 0.93 + Math.random() * 0.03, 0.35, 0.25);
         }

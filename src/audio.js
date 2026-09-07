@@ -177,40 +177,7 @@ class SoundEngine {
       } catch (_) {}
     }
 
-    // A. Tumbling friction / crunch bed (textured noise sliding over felt/wood)
-    if (this.noiseBuffer) {
-      const crunchSource = this.ctx.createBufferSource();
-      crunchSource.buffer = this.noiseBuffer;
-      crunchSource.loop = true;
-
-      const filter1 = this.ctx.createBiquadFilter();
-      filter1.type = 'bandpass';
-      filter1.frequency.setValueAtTime(1250, startTime);
-      filter1.frequency.exponentialRampToValueAtTime(650, startTime + durSec * 0.85);
-      filter1.Q.setValueAtTime(1.8, startTime);
-
-      const crunchGain = this.ctx.createGain();
-      crunchGain.gain.setValueAtTime(0.001, startTime);
-      // Fast swell at launch
-      crunchGain.gain.linearRampToValueAtTime(0.38, startTime + 0.06);
-      // Rattle modulation
-      for (let i = 1; i < 7; i++) {
-        const timePoint = startTime + (durSec * 0.1) + (i * durSec * 0.12);
-        const gainVal = 0.2 + (Math.random() * 0.2);
-        crunchGain.gain.setValueAtTime(gainVal, timePoint);
-      }
-      // Decay out
-      crunchGain.gain.exponentialRampToValueAtTime(0.001, startTime + durSec * 0.9);
-
-      crunchSource.connect(filter1);
-      filter1.connect(crunchGain);
-      crunchGain.connect(this.masterGain);
-
-      crunchSource.start(startTime);
-      crunchSource.stop(startTime + durSec);
-    }
-
-    // B. Micro-impact cascades (14 to 20 individual dice collisions)
+    // Micro-impact cascades (individual dice collisions)
     const numImpacts = 20 + Math.floor(Math.random() * 6);
     for (let i = 0; i < numImpacts; i++) {
       const progress = Math.pow(i / numImpacts, 1.55);
@@ -222,7 +189,7 @@ class SoundEngine {
       this.scheduleSingleImpact(impactTime, energy, pan);
     }
 
-    // C. Final crisp settling clacks
+    // Final crisp settling clacks
     const settle1 = startTime + durSec * 0.80 + Math.random() * 0.04;
     const settle2 = startTime + durSec * 0.93 + Math.random() * 0.04;
     this.scheduleSingleImpact(settle1, 0.45, -0.2);
