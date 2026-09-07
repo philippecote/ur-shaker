@@ -1174,7 +1174,9 @@
       let diceObjects = [];
       let isRolling = false;
       let rollStartTime = 0;
-      let rollDuration = 1200; // ms
+      let rollDuration = 1200; // ms — audio cue length
+      let maxRollDuration = 2600; // ms — physics timeout
+      let minRollDuration = 650; // ms — minimum tumble before settle can finish
       let rollResults = [0, 0, 0, 0];
       let rollHistory = [];
       let cameraPerspectiveMode = false;
@@ -1208,6 +1210,54 @@
       // V0 & V1 are MARKED (scores 1 when apex points UP).
       // V2 & V3 are UNMARKED (scores 0 when apex points UP).
       const VERTEX_MARKED = [true, true, false, false];
+
+      // Physics settle thresholds
+      const SETTLE_LINEAR_SPEED = 0.45;
+      const SETTLE_ANGULAR_SPEED = 1.8;
+      const SETTLE_SLERP_RATE = 4.2;
+      const _worldVertex = new THREE.Vector3();
+
+      function getTopApexIndex(die) {
+        let maxY = -Infinity;
+        let apexIdx = 0;
+        for (let i = 0; i < 4; i++) {
+          _worldVertex.copy(TETRA_VERTICES[i]).multiplyScalar(DIE_RADIUS);
+          _worldVertex.applyQuaternion(die.group.quaternion);
+          _worldVertex.y += die.group.position.y;
+          if (_worldVertex.y > maxY) {
+            maxY = _worldVertex.y;
+            apexIdx = i;
+          }
+        }
+        return apexIdx;
+      }
+
+      function getDieScore(die) {
+        return VERTEX_MARKED[getTopApexIndex(die)] ? 1 : 0;
+      }
+
+      function extractYawFromQuaternion(q) {
+        const euler = new THREE.Euler().setFromQuaternion(q, 'YXZ');
+        return euler.y;
+      }
+
+      function computeRestQuaternion(vertexIdx, yawAngle) {
+        const qAlign = new THREE.Quaternion().setFromUnitVectors(
+          TETRA_VERTICES[vertexIdx].clone(),
+          new THREE.Vector3(0, 1, 0)
+        );
+        const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawAngle);
+        qYaw.multiply(qAlign);
+        return qYaw;
+      }
+
+      function beginDieSettling(die) {
+        if (die.isSettling) return;
+        die.isSettling = true;
+        die.settleApexIdx = getTopApexIndex(die);
+        die.settleYaw = extractYawFromQuaternion(die.group.quaternion);
+        die.settleTargetQuat = computeRestQuaternion(die.settleApexIdx, die.settleYaw);
+      }
 
       function init3D() {
         scene = new THREE.Scene();
@@ -1679,10 +1729,12 @@
             group: die.group,
             velocity: new THREE.Vector3(0, 0, 0),
             angularVelocity: new THREE.Vector3(0, 0, 0),
-            targetQuaternion: die.group.quaternion.clone(),
             restingHeight: 0.48,
-            outcomeScore: 0,
-            chosenVertex: 0
+            isSettling: false,
+            fullySettled: true,
+            settleApexIdx: 0,
+            settleYaw: 0,
+            settleTargetQuat: die.group.quaternion.clone()
           });
         }
       }
@@ -1709,7 +1761,7 @@
 
       // ======================================================================
       // 3. ROLL MECHANICS & PHYSICS SIMULATION
-      // Authentic Royal Game of Ur Probabilities (50% per die)
+      // Pure physics tumble — score read from whichever apex lands up
       // ======================================================================
 
       function rollDice() {
@@ -1723,7 +1775,7 @@
         const rollBtn = document.getElementById('roll-button');
         rollBtn.classList.add('rolling', 'pressed');
         document.getElementById('button-label').textContent = 'ROLLING...';
-        document.getElementById('score-outcome').textContent = 'SHAKING...';
+        document.getElementById('score-outcome').textContent = 'ROLLING...';
         document.getElementById('score-total').textContent = '...';
 
         for (let i = 0; i < 4; i++) {
@@ -1733,33 +1785,14 @@
         }
 
         rollStartTime = performance.now();
-
-        // 1. Determine authentic Ur score outcome
-        // Each die independently has a 50% chance of 1, 50% of 0.
         rollResults = [];
-        let totalScore = 0;
 
         for (let i = 0; i < 4; i++) {
-          const score = Math.random() < 0.5 ? 1 : 0;
-          rollResults.push(score);
-          totalScore += score;
-
           const die = diceObjects[i];
-          die.outcomeScore = score;
+          die.isSettling = false;
+          die.fullySettled = false;
 
-          // If score is 1: pick V0 or V1 (marked)
-          // If score is 0: pick V2 or V3 (unmarked)
-          const chosenVertex = score === 1 ? (Math.random() < 0.5 ? 0 : 1) : (Math.random() < 0.5 ? 2 : 3);
-          die.chosenVertex = chosenVertex;
-
-          // Target resting orientation (face flat on table, apex up)
-          const yaw = Math.random() * Math.PI * 2;
-          const qAlign = new THREE.Quaternion().setFromUnitVectors(TETRA_VERTICES[chosenVertex], new THREE.Vector3(0, 1, 0));
-          const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-          qYaw.multiply(qAlign);
-          die.targetQuaternion.copy(qYaw);
-
-          // Launch from current resting spot with physical impulse
+          // Launch from current resting spot with random physical impulses
           const launchAngle = Math.random() * Math.PI * 2;
           const launchPower = 4.5 + Math.random() * 4.0;
           die.velocity.set(
@@ -1768,11 +1801,10 @@
             Math.sin(launchAngle) * launchPower
           );
 
-          // Tumbling angular spin
           die.angularVelocity.set(
-            (Math.random() - 0.5) * 36.0,
-            (Math.random() - 0.5) * 36.0,
-            (Math.random() - 0.5) * 36.0
+            (Math.random() - 0.5) * 38.0,
+            (Math.random() - 0.5) * 38.0,
+            (Math.random() - 0.5) * 38.0
           );
         }
 
@@ -1790,23 +1822,58 @@
         if (!isRolling) return;
 
         const elapsed = performance.now() - rollStartTime;
-        const progress = Math.min(elapsed / rollDuration, 1.0);
-
+        const forceSettle = elapsed >= rollDuration * 0.82;
         const boundX = (TRAY_WIDTH / 2) - DIE_RADIUS * 0.9;
         const boundZ = (TRAY_LENGTH / 2) - DIE_RADIUS * 0.9;
+        let allFullySettled = true;
 
         for (let i = 0; i < 4; i++) {
           const die = diceObjects[i];
+          const linSpeed = die.velocity.length();
+          const angSpeed = die.angularVelocity.length();
+          const onFloor = die.group.position.y <= die.restingHeight + 0.08;
 
-          if (progress < 0.72) {
-            // Free flight and bouncing phase
-            die.velocity.y -= 28.0 * deltaTime; // Gravity
+          if (!die.isSettling && onFloor && (linSpeed < SETTLE_LINEAR_SPEED && angSpeed < SETTLE_ANGULAR_SPEED || forceSettle)) {
+            beginDieSettling(die);
+          }
+
+          if (die.isSettling) {
+            die.velocity.multiplyScalar(Math.pow(0.55, deltaTime * 14));
+            die.angularVelocity.multiplyScalar(Math.pow(0.45, deltaTime * 14));
+
+            die.group.position.x += die.velocity.x * deltaTime;
+            die.group.position.z += die.velocity.z * deltaTime;
+            die.group.position.y = THREE.MathUtils.lerp(
+              die.group.position.y,
+              die.restingHeight,
+              1 - Math.pow(0.001, deltaTime * 10)
+            );
+
+            const slerpFactor = 1 - Math.pow(0.001, deltaTime * SETTLE_SLERP_RATE);
+            die.group.quaternion.slerp(die.settleTargetQuat, slerpFactor);
+
+            if (linSpeed < 0.08) {
+              die.velocity.set(0, 0, 0);
+            }
+            if (angSpeed < 0.15) {
+              die.angularVelocity.set(0, 0, 0);
+            }
+
+            const angleDiff = die.group.quaternion.angleTo(die.settleTargetQuat);
+            die.fullySettled = angleDiff < 0.025 &&
+              Math.abs(die.group.position.y - die.restingHeight) < 0.02 &&
+              linSpeed < 0.12 &&
+              angSpeed < 0.2;
+          } else {
+            die.fullySettled = false;
+            allFullySettled = false;
+
+            die.velocity.y -= 28.0 * deltaTime;
 
             die.group.position.x += die.velocity.x * deltaTime;
             die.group.position.y += die.velocity.y * deltaTime;
             die.group.position.z += die.velocity.z * deltaTime;
 
-            // Apply angular velocity to quaternion
             const deltaRot = new THREE.Quaternion();
             const rotAxis = die.angularVelocity.clone().normalize();
             const rotAngle = die.angularVelocity.length() * deltaTime;
@@ -1815,53 +1882,41 @@
               die.group.quaternion.multiplyQuaternions(deltaRot, die.group.quaternion);
             }
 
-            // Damping
-            die.angularVelocity.multiplyScalar(Math.pow(0.85, deltaTime * 10));
+            die.angularVelocity.multiplyScalar(Math.pow(0.84, deltaTime * 10));
+            die.velocity.x *= Math.pow(0.992, deltaTime * 60);
+            die.velocity.z *= Math.pow(0.992, deltaTime * 60);
 
-            // Floor collision
             if (die.group.position.y <= die.restingHeight) {
               die.group.position.y = die.restingHeight;
               if (Math.abs(die.velocity.y) > 0.8) {
                 const impactVel = Math.abs(die.velocity.y) / 8.0;
                 audio.playImpact(impactVel, die.group.position.x / boundX);
-                die.velocity.y = -die.velocity.y * 0.48;
-                die.velocity.x *= 0.75;
-                die.velocity.z *= 0.75;
+                die.velocity.y = -die.velocity.y * 0.46;
+                die.velocity.x *= 0.72;
+                die.velocity.z *= 0.72;
+                die.angularVelocity.multiplyScalar(1.08);
               } else {
                 die.velocity.y = 0;
               }
             }
 
-            // Tray walls collision
             if (Math.abs(die.group.position.x) > boundX) {
               die.group.position.x = Math.sign(die.group.position.x) * boundX;
-              die.velocity.x = -die.velocity.x * 0.55;
+              die.velocity.x = -die.velocity.x * 0.52;
               audio.playImpact(0.4, die.group.position.x / boundX);
             }
             if (Math.abs(die.group.position.z) > boundZ) {
               die.group.position.z = Math.sign(die.group.position.z) * boundZ;
-              die.velocity.z = -die.velocity.z * 0.55;
+              die.velocity.z = -die.velocity.z * 0.52;
               audio.playImpact(0.4, die.group.position.x / boundX);
             }
-          } else {
-            // Settle: keep landed X/Z, ease Y to table, slerp to outcome face
-            const settleProgress = (progress - 0.72) / 0.28;
-            const ease = easeOutCubic(settleProgress);
+          }
 
-            die.velocity.set(0, 0, 0);
-            die.angularVelocity.multiplyScalar(Math.pow(0.7, deltaTime * 12));
-
-            die.group.position.y = THREE.MathUtils.lerp(
-              die.group.position.y,
-              die.restingHeight,
-              ease * 0.35
-            );
-            die.group.quaternion.slerp(die.targetQuaternion, ease * 0.28);
+          if (!die.fullySettled) {
+            allFullySettled = false;
           }
         }
 
-        // Inter-die soft separation (gentle nudge if overlapping)
-        const separating = progress >= 0.72;
         for (let i = 0; i < 4; i++) {
           for (let j = i + 1; j < 4; j++) {
             const d1 = diceObjects[i];
@@ -1873,13 +1928,14 @@
             if (distXZ < minDist && distXZ > 0.001) {
               const normalX = dx / distXZ;
               const normalZ = dz / distXZ;
+              const separating = d1.isSettling || d2.isSettling;
               const overlap = (minDist - distXZ) * (separating ? 0.35 : 0.5);
               d1.group.position.x += normalX * overlap;
               d1.group.position.z += normalZ * overlap;
               d2.group.position.x -= normalX * overlap;
               d2.group.position.z -= normalZ * overlap;
 
-              if (!separating && progress < 0.6) {
+              if (!separating) {
                 d1.velocity.x += normalX * 1.8;
                 d1.velocity.z += normalZ * 1.8;
                 d2.velocity.x -= normalX * 1.8;
@@ -1890,41 +1946,53 @@
           }
         }
 
-        // Keep dice within tray bounds after separation
         for (let i = 0; i < 4; i++) {
           clampDieToTray(diceObjects[i], boundX, boundZ);
         }
 
-        // Roll completion check
-        if (progress >= 1.0) {
+        if (elapsed >= maxRollDuration) {
+          for (let i = 0; i < 4; i++) {
+            const die = diceObjects[i];
+            beginDieSettling(die);
+            die.group.position.y = die.restingHeight;
+            die.group.quaternion.copy(die.settleTargetQuat);
+            die.velocity.set(0, 0, 0);
+            die.angularVelocity.set(0, 0, 0);
+            die.fullySettled = true;
+          }
+          finishRoll();
+        } else if (allFullySettled && elapsed >= minRollDuration) {
           finishRoll();
         }
       }
 
-      function easeOutCubic(x) {
-        return 1 - Math.pow(1 - x, 3);
-      }
-
       function finishRoll() {
+        if (!isRolling) return;
         isRolling = false;
 
-        // Finalize resting orientation only — keep landed X/Z positions
         const boundX = (TRAY_WIDTH / 2) - DIE_RADIUS * 0.9;
         const boundZ = (TRAY_LENGTH / 2) - DIE_RADIUS * 0.9;
+        rollResults = [];
+
         for (let i = 0; i < 4; i++) {
           const die = diceObjects[i];
+          if (!die.isSettling) {
+            beginDieSettling(die);
+          }
           die.group.position.y = die.restingHeight;
           clampDieToTray(die, boundX, boundZ);
-          die.group.quaternion.copy(die.targetQuaternion);
+          die.group.quaternion.copy(die.settleTargetQuat);
           die.velocity.set(0, 0, 0);
           die.angularVelocity.set(0, 0, 0);
+          die.fullySettled = true;
+
+          rollResults.push(getDieScore(die));
         }
 
         const rollBtn = document.getElementById('roll-button');
         rollBtn.classList.remove('rolling');
         document.getElementById('button-label').textContent = 'ROLL DICE';
 
-        // Calculate total score
         const total = rollResults.reduce((a, b) => a + b, 0);
 
         // Update score display
@@ -2137,7 +2205,13 @@
         y: d.group.position.y,
         z: d.group.position.z,
       }));
+      window.getTopApexIndices = () => diceObjects.map((d) => getTopApexIndex(d));
+      window.getDiceScores = () => diceObjects.map((d) => getDieScore(d));
       window.isRolling = () => isRolling;
+      window.getFramingMetrics = () => {
+        const insets = getBoardViewportInsets();
+        return { ...insets, trayScreenY: projectTrayCenterToScreenY() };
+      };
 
       // Initialize 3D Engine on load or immediately if already ready
       if (document.readyState === 'loading') {
