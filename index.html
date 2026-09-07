@@ -1,0 +1,2152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Royal Game of Ur - Dice Shaker</title>
+  <meta name="description" content="Authentic 3D tetrahedral dice shaker for the ancient Royal Game of Ur with crunchy sound effects and mobile-optimized layout.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#080c14">
+
+  <!-- Ancient Mesopotamian Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Cinzel+Decorative:wght@700;900&family=Marcellus&display=swap" rel="stylesheet">
+
+  <!-- Local Three.js with CDN fallback for 100% offline and standalone operation -->
+  <script src="vendor/three.min.js"></script>
+  <script>
+    if (!window.THREE) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-dark: #080c14;
+      --tray-wood: #2a1810;
+      --tray-inner: #16222f;
+      --gold-primary: #f5c842;
+      --gold-light: #ffea88;
+      --gold-dark: #b88616;
+      --gold-deep: #805c0d;
+      --lapis-deep: #0a192f;
+      --lapis-bright: #1b497e;
+      --lapis-royal: #133b68;
+      --carnelian: #a82e1a;
+      --bone-white: #f5f0dc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: #fff;
+      font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    /* Main Container: Board gets priority; button shrinks on short screens */
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      position: relative;
+      background: radial-gradient(circle at 50% 20%, #152238 0%, #080c14 100%);
+    }
+
+    /* ====================================================================
+       UPPER AREA: 3D Dice Shaker & Total Display (flexible, priority)
+       ==================================================================== */
+    .dice-container {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+      box-shadow: inset 0 -15px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #webgl-canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Top HUD Container: Ensures clean, spacious vertical flow between Header and Score */
+    .top-hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: max(12px, env(safe-area-inset-top, 12px)) 16px 0 16px;
+      gap: 14px;
+      pointer-events: none;
+    }
+
+    /* Header Bar Overlay */
+    .header-bar {
+      position: relative;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0;
+      pointer-events: none;
+    }
+
+    .header-title-box {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(10, 20, 35, 0.85);
+      border: 1px solid rgba(245, 200, 66, 0.35);
+      padding: 5px 12px;
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .ur-symbol {
+      color: var(--gold-primary);
+      font-size: 1.15rem;
+      filter: drop-shadow(0 0 4px rgba(245, 200, 66, 0.6));
+    }
+
+    .game-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: var(--gold-light);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .header-actions {
+      pointer-events: auto;
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(14, 25, 42, 0.85);
+      border: 1px solid rgba(245, 200, 66, 0.35);
+      color: var(--gold-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      backdrop-filter: blur(8px);
+    }
+
+    .icon-btn:hover {
+      background: rgba(27, 73, 126, 0.9);
+      border-color: var(--gold-primary);
+      transform: scale(1.05);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.92);
+    }
+
+    .icon-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    /* Floating Score / Total Display Overlay */
+    .score-banner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      width: min(100%, 360px);
+      margin: 0 auto;
+    }
+
+    .score-card {
+      background: radial-gradient(circle at 50% 25%, rgba(20, 38, 64, 0.94), rgba(10, 16, 26, 0.96));
+      border: 1.5px solid var(--gold-primary);
+      border-radius: 20px;
+      padding: 12px 18px 14px 18px;
+      width: 100%;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75),
+                  0 0 20px rgba(245, 200, 66, 0.22),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Rosette accents in card corners */
+    .score-card::before, .score-card::after {
+      content: '❖';
+      position: absolute;
+      font-size: 0.65rem;
+      color: var(--gold-primary);
+      opacity: 0.6;
+    }
+    .score-card::before { top: 8px; left: 10px; }
+    .score-card::after { top: 8px; right: 10px; }
+
+    .score-main-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .score-label-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      line-height: 1.15;
+    }
+
+    .score-subtitle {
+      font-family: 'Cinzel', serif;
+      font-size: 0.64rem;
+      letter-spacing: 2px;
+      color: var(--gold-primary);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .score-outcome-text {
+      font-family: 'Cinzel', serif;
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #fff;
+      transition: color 0.3s ease;
+    }
+
+    .score-number-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-number {
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-size: 2.7rem;
+      font-weight: 900;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 16px rgba(245, 200, 66, 0.7), 0 2px 4px rgba(0, 0, 0, 0.8);
+      background: linear-gradient(180deg, #ffffff 10%, #ffeaa7 50%, #f5c842 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      min-width: 46px;
+      text-align: center;
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .score-number.pop {
+      animation: scorePop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes scorePop {
+      0% { transform: scale(0.6); opacity: 0.3; }
+      50% { transform: scale(1.35); opacity: 1; }
+      100% { transform: scale(1.0); opacity: 1; }
+    }
+
+    /* Individual 4 Dice Breakdown Chips */
+    .dice-chips-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding-top: 8px;
+      border-top: 1px solid rgba(245, 200, 66, 0.22);
+    }
+
+    .die-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(10, 18, 30, 0.7);
+      border: 1px solid rgba(245, 200, 66, 0.3);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      font-family: 'Cinzel', serif;
+      transition: all 0.3s ease;
+    }
+
+    .die-chip.hit {
+      border-color: var(--gold-primary);
+      background: rgba(45, 35, 10, 0.85);
+      color: var(--gold-light);
+      box-shadow: 0 0 10px rgba(245, 200, 66, 0.4);
+    }
+
+    .die-chip.miss {
+      border-color: rgba(148, 163, 184, 0.3);
+      color: rgba(148, 163, 184, 0.6);
+      background: rgba(10, 15, 22, 0.6);
+    }
+
+    .die-icon-pyramid {
+      font-size: 0.82rem;
+      line-height: 1;
+    }
+
+    .die-chip.hit .die-icon-pyramid {
+      color: var(--gold-primary);
+      text-shadow: 0 0 5px rgba(245, 200, 66, 0.9);
+    }
+
+    /* History Pill Bar */
+    .history-bar {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(10, 16, 26, 0.7);
+      padding: 3px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .history-label {
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gold-dark);
+      font-weight: 700;
+    }
+
+    .history-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .history-dot {
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .history-dot.score-0 { background: rgba(70, 80, 95, 0.6); border-color: #64748b; color: #cbd5e1; }
+    .history-dot.score-1 { background: rgba(22, 55, 95, 0.8); border-color: #38bdf8; color: #e0f2fe; }
+    .history-dot.score-2 { background: rgba(100, 40, 20, 0.8); border-color: #fb923c; color: #ffedd5; }
+    .history-dot.score-3 { background: rgba(110, 80, 15, 0.85); border-color: #facc15; color: #fef08a; }
+    .history-dot.score-4 { background: rgba(180, 130, 20, 0.95); border-color: #fef08a; color: #fff; box-shadow: 0 0 6px #f5c842; }
+
+    @keyframes fadeIn {
+      from { transform: scale(0.4); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .tray-hint {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      color: rgba(245, 200, 66, 0.55);
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 5;
+      font-family: 'Cinzel', serif;
+      white-space: nowrap;
+    }
+
+    /* ====================================================================
+       LOWER AREA: Roll Button (shrinks to keep board in view)
+       ==================================================================== */
+    .button-section {
+      flex: 0 0 auto;
+      width: 100%;
+      padding: 8px 14px max(10px, env(safe-area-inset-bottom, 10px)) 14px;
+      background: linear-gradient(180deg, rgba(8, 14, 24, 0.98) 0%, #05080e 100%);
+      border-top: 2px solid rgba(245, 200, 66, 0.45);
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 20;
+    }
+
+    /* GIANT TACTILE ROLL BUTTON */
+    .roll-button {
+      position: relative;
+      width: 100%;
+      height: clamp(76px, 17dvh, 150px);
+      max-width: 520px;
+      border: none;
+      outline: none;
+      border-radius: 24px;
+      cursor: pointer;
+      overflow: hidden;
+      /* Authentic Mesopotamian 3D Beveled Look */
+      background: radial-gradient(circle at 50% 20%, #255b96 0%, #163d69 45%, #0c233d 80%, #061322 100%);
+      box-shadow: 
+        0 2px 0 0 rgba(255, 255, 255, 0.35) inset,
+        0 -4px 0 0 rgba(0, 0, 0, 0.7) inset,
+        0 8px 0 0 #040912,
+        0 12px 26px rgba(0, 0, 0, 0.85),
+        0 0 30px rgba(27, 73, 126, 0.45);
+      transform: translateY(0);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 16px;
+      touch-action: manipulation;
+    }
+
+    /* Outer Gold Filigree Border */
+    .roll-button-frame {
+      position: absolute;
+      inset: 4px;
+      border: 2px solid var(--gold-primary);
+      border-radius: 19px;
+      pointer-events: none;
+      box-shadow: inset 0 0 14px rgba(245, 200, 66, 0.3);
+    }
+
+    .roll-button-frame::before, .roll-button-frame::after {
+      content: '❖';
+      position: absolute;
+      font-size: 0.85rem;
+      color: var(--gold-primary);
+      filter: drop-shadow(0 0 4px var(--gold-primary));
+    }
+    .roll-button-frame::before { top: 6px; left: 10px; }
+    .roll-button-frame::after { top: 6px; right: 10px; }
+
+    /* Button Inner Content */
+    .button-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+
+    .button-rosette {
+      width: clamp(28px, 6vw, 36px);
+      height: clamp(28px, 6vw, 36px);
+      color: var(--gold-primary);
+      filter: drop-shadow(0 0 8px rgba(245, 200, 66, 0.7));
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .roll-button:hover .button-rosette {
+      transform: rotate(45deg) scale(1.1);
+    }
+
+    .button-main-text {
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-size: clamp(1.6rem, 6.5vw, 2.4rem);
+      font-weight: 900;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #ffffff 0%, #fff1b8 40%, #f5c842 80%, #b88616 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
+      line-height: 1.1;
+    }
+
+    .button-sub-text {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(0.7rem, 2.5vw, 0.9rem);
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--gold-light);
+      text-transform: uppercase;
+      opacity: 0.95;
+    }
+
+    /* Tactile Press State: Real Physical Button Compression */
+    .roll-button:active, .roll-button.pressed {
+      transform: translateY(6px);
+      box-shadow: 
+        0 1px 0 0 rgba(255, 255, 255, 0.2) inset,
+        0 2px 0 0 #040912,
+        0 4px 12px rgba(0, 0, 0, 0.9),
+        0 0 35px rgba(245, 200, 66, 0.55);
+      background: radial-gradient(circle at 50% 30%, #1b4573 0%, #102e52 50%, #061526 100%);
+    }
+
+    .roll-button:active .button-rosette, .roll-button.pressed .button-rosette {
+      transform: scale(0.92) rotate(25deg);
+    }
+
+    /* Rolling State: Radiant Pulsing while tumbling */
+    .roll-button.rolling {
+      filter: brightness(1.15);
+      animation: buttonPulse 0.9s infinite alternate;
+    }
+
+    @keyframes buttonPulse {
+      0% { box-shadow: 0 8px 0 0 #040912, 0 12px 26px rgba(0, 0, 0, 0.85), 0 0 20px rgba(245, 200, 66, 0.4); }
+      100% { box-shadow: 0 8px 0 0 #040912, 0 12px 26px rgba(0, 0, 0, 0.85), 0 0 45px rgba(245, 200, 66, 0.9); }
+    }
+
+    /* Sub-row inside button area for extra mobile conveniences */
+    .button-subtext-bar {
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-size: 0.65rem;
+      color: rgba(245, 200, 66, 0.7);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-family: 'Cinzel', serif;
+    }
+
+    /* Short screens: squeeze button further, tighten HUD */
+    @media (max-height: 740px) {
+      .top-hud {
+        gap: 10px;
+        padding-top: max(8px, env(safe-area-inset-top, 8px));
+      }
+
+      .score-card {
+        padding: 8px 14px 10px 14px;
+      }
+
+      .score-number {
+        font-size: 2.3rem;
+      }
+
+      .button-section {
+        padding: 6px 12px max(8px, env(safe-area-inset-bottom, 8px)) 12px;
+      }
+
+      .roll-button {
+        height: clamp(68px, 14dvh, 120px);
+        border-radius: 20px;
+      }
+
+      .button-subtext-bar {
+        display: none;
+      }
+    }
+
+    @media (max-height: 620px) {
+      .history-bar {
+        display: none !important;
+      }
+
+      .tray-hint {
+        display: none;
+      }
+
+      .roll-button {
+        height: clamp(60px, 12dvh, 96px);
+      }
+    }
+
+    .shake-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .shake-badge svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+      animation: gentleShake 3s ease-in-out infinite;
+    }
+
+    @keyframes gentleShake {
+      0%, 80%, 100% { transform: rotate(0deg); }
+      85% { transform: rotate(-10deg); }
+      90% { transform: rotate(10deg); }
+      95% { transform: rotate(-6deg); }
+    }
+
+    /* Rules Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-dialog {
+      background: radial-gradient(circle at 50% 20%, #15253d 0%, #0a101a 100%);
+      border: 2px solid var(--gold-primary);
+      border-radius: 20px;
+      padding: 22px;
+      width: min(92%, 400px);
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(245, 200, 66, 0.25);
+      color: #e2e8f0;
+      position: relative;
+    }
+
+    .modal-close-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(245, 200, 66, 0.4);
+      background: rgba(10, 18, 30, 0.8);
+      color: var(--gold-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    .modal-title {
+      font-family: 'Cinzel Decorative', serif;
+      font-size: 1.25rem;
+      color: var(--gold-primary);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .modal-body p {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 10px;
+      color: #cbd5e1;
+    }
+
+    .modal-dice-explainer {
+      background: rgba(8, 14, 24, 0.75);
+      border: 1px solid rgba(245, 200, 66, 0.25);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 12px 0;
+      font-size: 0.84rem;
+    }
+
+    .modal-dice-explainer ul {
+      padding-left: 18px;
+      margin-top: 6px;
+    }
+
+    .modal-dice-explainer li {
+      margin-bottom: 5px;
+    }
+
+    /* Sound Toast */
+    .toast {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(14, 25, 42, 0.95);
+      border: 1px solid var(--gold-primary);
+      color: var(--gold-light);
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 0.75rem;
+      font-family: 'Cinzel', serif;
+      letter-spacing: 1px;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 50;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-wrapper">
+
+    <!-- UPPER 2/3: 3D DICE SHAKER & TOTAL SCORE DISPLAY -->
+    <section class="dice-container" id="dice-container" aria-label="Royal Game of Ur 3D Dice Tray">
+      
+      <!-- Three.js Canvas -->
+      <canvas id="webgl-canvas"></canvas>
+
+      <!-- Top HUD Overlay: Clean, spacious Header & Total Score Banner -->
+      <div class="top-hud">
+        <header class="header-bar">
+          <div class="header-title-box">
+            <span class="ur-symbol">𒌨</span>
+            <span class="game-title">Royal Game of Ur</span>
+          </div>
+
+          <div class="header-actions">
+            <button class="icon-btn" id="camera-btn" title="Toggle Camera Angle" aria-label="Toggle Camera Angle">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+              </svg>
+            </button>
+            <button class="icon-btn" id="mute-btn" title="Toggle Sound" aria-label="Toggle Sound">
+              <svg id="sound-icon-on" viewBox="0 0 24 24">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+              </svg>
+              <svg id="sound-icon-off" viewBox="0 0 24 24" style="display: none;">
+                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+              </svg>
+            </button>
+            <button class="icon-btn" id="rules-btn" title="Rules & Info" aria-label="Rules & Info">
+              <svg viewBox="0 0 24 24">
+                <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Floating Score / Total Display -->
+        <div class="score-banner">
+          <div class="score-card" id="score-card">
+            <div class="score-main-row">
+              <div class="score-number-wrapper">
+                <span class="score-number" id="score-total">--</span>
+              </div>
+              <div class="score-label-col">
+                <span class="score-subtitle">TOTAL ROLL</span>
+                <span class="score-outcome-text" id="score-outcome">TAP TO ROLL</span>
+              </div>
+            </div>
+
+            <!-- Individual 4 Dice Breakdown -->
+            <div class="dice-chips-row">
+              <div class="die-chip" id="chip-0"><span class="die-icon-pyramid">▲</span><span class="die-val">?</span></div>
+              <div class="die-chip" id="chip-1"><span class="die-icon-pyramid">▲</span><span class="die-val">?</span></div>
+              <div class="die-chip" id="chip-2"><span class="die-icon-pyramid">▲</span><span class="die-val">?</span></div>
+              <div class="die-chip" id="chip-3"><span class="die-icon-pyramid">▲</span><span class="die-val">?</span></div>
+            </div>
+          </div>
+
+          <!-- History Dots -->
+          <div class="history-bar" id="history-bar" style="display: none;">
+            <span class="history-label">RECENT</span>
+            <div class="history-dots" id="history-dots"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tray-hint">TAP TRAY OR BUTTON TO ROLL • DRAG TO TILT</div>
+    </section>
+
+    <!-- LOWER 1/3: GIANT TACTILE ROLL BUTTON -->
+    <section class="button-section" aria-label="Dice Controls">
+      <button class="roll-button" id="roll-button" aria-label="Roll Royal Game of Ur Dice">
+        <div class="roll-button-frame"></div>
+        <div class="button-content">
+          <!-- Mesopotamian 8-Pointed Rosette Emblem -->
+          <svg class="button-rosette" viewBox="0 0 100 100" fill="currentColor">
+            <path d="M50 0 C53 30 70 47 100 50 C70 53 53 70 50 100 C47 70 30 53 0 50 C30 47 47 30 50 0 Z"/>
+            <path d="M50 15 C52 35 65 48 85 50 C65 52 52 65 50 85 C48 65 35 52 15 50 C35 48 48 35 50 15 Z" fill="#ffd700" opacity="0.6"/>
+            <circle cx="50" cy="50" r="10" fill="#fff"/>
+            <circle cx="50" cy="50" r="5" fill="#a82e1a"/>
+          </svg>
+          <span class="button-main-text" id="button-label">ROLL DICE</span>
+          <span class="button-sub-text">TAP OR SHAKE TO ROLL</span>
+        </div>
+      </button>
+
+      <div class="button-subtext-bar">
+        <div class="shake-badge">
+          <svg viewBox="0 0 24 24">
+            <path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm1 18H7V5h10v14zM1 10h2v4H1zm20 0h2v4h-2z"/>
+          </svg>
+          <span>SHAKE PHONE TO ROLL</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Rules Modal -->
+  <div class="modal-backdrop" id="rules-modal">
+    <div class="modal-dialog">
+      <button class="modal-close-btn" id="modal-close" aria-label="Close Rules">&times;</button>
+      <h2 class="modal-title">THE ROYAL GAME OF UR</h2>
+      <div class="modal-body">
+        <p>Excavated from the Royal Cemetery of Ur (Mesopotamia, c. 2600 BCE), this is one of the oldest board games known to humanity.</p>
+        
+        <div class="modal-dice-explainer">
+          <strong style="color: var(--gold-primary);">The 4 Tetrahedral Dice:</strong>
+          <ul>
+            <li>Each die is a regular 4-sided pyramid (tetrahedron).</li>
+            <li><strong>2 corners</strong> are marked with white inlaid rosettes (scores <strong>1</strong>).</li>
+            <li><strong>2 corners</strong> are blank (scores <strong>0</strong>).</li>
+            <li>When rolled, the die rests on a flat face and one corner points <strong>directly UP</strong>.</li>
+            <li>If the upward-pointing corner is marked, it scores 1; otherwise 0.</li>
+          </ul>
+        </div>
+
+        <p><strong style="color: var(--gold-light);">Total Roll Probabilities:</strong></p>
+        <p style="font-size: 0.85rem; line-height: 1.6;">
+          • <strong>0</strong> (6.25%) — No moves! Turn is lost.<br>
+          • <strong>1</strong> (25.0%) — Move 1 square.<br>
+          • <strong>2</strong> (37.5%) — Move 2 squares.<br>
+          • <strong>3</strong> (25.0%) — Move 3 squares.<br>
+          • <strong>4</strong> (6.25%) — Move 4 squares (Max roll!).
+        </p>
+
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 12px; text-align: center;">
+          Shake your phone or tap the giant button to roll!
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast" id="toast">Sound Enabled</div>
+
+  <!-- MAIN SCRIPT: Audio Engine + Three.js 3D Dice Simulation + UI Controls -->
+  <script>
+    (function() {
+      'use strict';
+
+      // ======================================================================
+      // 1. PROCEDURAL CRUNCHY WEB AUDIO ENGINE
+      // Authentic tactile bone, ceramic, and wood dice clatter
+      // Multi-layer crunch: high snap, bandpass friction grit, wood box thud
+      // ======================================================================
+      class CrunchyAudioEngine {
+        constructor() {
+          this.ctx = null;
+          this.muted = localStorage.getItem('ur_dice_muted') === 'true';
+          this.masterGain = null;
+          this.noiseBuffer = null;
+          this.initialized = false;
+        }
+
+        init() {
+          if (this.initialized && this.ctx) {
+            if (this.ctx.state === 'suspended') {
+              this.ctx.resume();
+            }
+            return;
+          }
+
+          try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            this.ctx = new AudioContextClass();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.setValueAtTime(this.muted ? 0 : 0.95, this.ctx.currentTime);
+
+            // Warm lowpass filter to remove high-pitched ringing and produce a rich, dull earthy acoustic
+            this.warmthFilter = this.ctx.createBiquadFilter();
+            this.warmthFilter.type = 'lowpass';
+            this.warmthFilter.frequency.setValueAtTime(1800, this.ctx.currentTime);
+            this.warmthFilter.Q.setValueAtTime(0.7, this.ctx.currentTime);
+
+            this.masterGain.connect(this.warmthFilter);
+            this.warmthFilter.connect(this.ctx.destination);
+
+            this.createNoiseBuffer();
+            this.initialized = true;
+          } catch (e) {
+            console.warn('AudioContext failed:', e);
+          }
+        }
+
+        createNoiseBuffer() {
+          if (!this.ctx) return;
+          const sampleRate = this.ctx.sampleRate;
+          const bufferSize = sampleRate * 2.0;
+          const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            // Textured gritty noise distribution for crunchy friction
+            data[i] = (Math.random() * 2 - 1) * 0.9;
+          }
+          this.noiseBuffer = buffer;
+        }
+
+        setMuted(mute) {
+          this.muted = mute;
+          localStorage.setItem('ur_dice_muted', mute);
+          if (this.masterGain && this.ctx) {
+            this.masterGain.gain.setValueAtTime(mute ? 0 : 0.95, this.ctx.currentTime);
+          }
+        }
+
+        toggleMute() {
+          this.init();
+          this.setMuted(!this.muted);
+          return this.muted;
+        }
+
+        // Single crunchy impact (bounce against floor/wall/die) - warm, dull bone/wood clack
+        playImpact(intensity = 0.5, panVal = 0) {
+          if (this.muted) return;
+          this.init();
+          if (!this.ctx || this.ctx.state === 'suspended') return;
+
+          const t = this.ctx.currentTime;
+          const vol = Math.min(Math.max(intensity, 0.08), 1.0);
+
+          // 1. Mellow stone/wood tap (520 - 980Hz, dropping to 180Hz)
+          const osc = this.ctx.createOscillator();
+          const oscGain = this.ctx.createGain();
+          const baseFreq = 520 + Math.random() * 460;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(baseFreq, t);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.35, t + 0.035);
+
+          oscGain.gain.setValueAtTime(vol * 0.5, t);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+
+          // 2. Dull gritty crunch (warm bandpass filtered noise at 950 - 1500Hz)
+          let noiseNode = null;
+          let noiseGain = null;
+          if (this.noiseBuffer) {
+            noiseNode = this.ctx.createBufferSource();
+            noiseNode.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1050 + Math.random() * 450, t);
+            filter.Q.setValueAtTime(2.2, t);
+
+            noiseGain = this.ctx.createGain();
+            noiseGain.gain.setValueAtTime(vol * 0.55, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+
+            noiseNode.connect(filter);
+            filter.connect(noiseGain);
+          }
+
+          // 3. Resonant wooden tray body thud (125Hz -> 38Hz)
+          const sub = this.ctx.createOscillator();
+          const subGain = this.ctx.createGain();
+          sub.type = 'sine';
+          sub.frequency.setValueAtTime(125 + Math.random() * 30, t);
+          sub.frequency.exponentialRampToValueAtTime(38, t + 0.045);
+
+          subGain.gain.setValueAtTime(vol * 0.38, t);
+          subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+
+          // Stereo panner for spatial immersion
+          let panner = null;
+          if (this.ctx.createStereoPanner) {
+            panner = this.ctx.createStereoPanner();
+            panner.pan.setValueAtTime(Math.max(-0.85, Math.min(0.85, panVal)), t);
+          }
+
+          const target = panner || this.masterGain;
+          osc.connect(oscGain);
+          oscGain.connect(target);
+
+          if (noiseNode && noiseGain) {
+            noiseGain.connect(target);
+            noiseNode.start(t);
+            noiseNode.stop(t + 0.035);
+          }
+
+          sub.connect(subGain);
+          subGain.connect(target);
+
+          if (panner) panner.connect(this.masterGain);
+
+          osc.start(t);
+          osc.stop(t + 0.035);
+          sub.start(t);
+          sub.stop(t + 0.045);
+        }
+
+        // Full cascading crunchy roll sequence
+        playFullCrunchyRoll(durationMs = 1200) {
+          if (this.muted) return;
+          this.init();
+          if (!this.ctx || this.ctx.state === 'suspended') return;
+
+          const start = this.ctx.currentTime;
+          const dur = durationMs / 1000;
+
+          // Mobile tactile vibration
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            try {
+              navigator.vibrate([22, 35, 18, 28, 15, 20, 10, 45]);
+            } catch (_) {}
+          }
+
+          // 1. Shaker rattle friction bed (textured noise sliding over tray)
+          if (this.noiseBuffer) {
+            const src = this.ctx.createBufferSource();
+            src.buffer = this.noiseBuffer;
+            src.loop = true;
+
+            const band = this.ctx.createBiquadFilter();
+            band.type = 'bandpass';
+            band.frequency.setValueAtTime(1250, start);
+            band.frequency.exponentialRampToValueAtTime(650, start + dur * 0.85);
+            band.Q.setValueAtTime(1.8, start);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.38, start + 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + dur * 0.88);
+
+            src.connect(band);
+            band.connect(gain);
+            gain.connect(this.masterGain);
+
+            src.start(start);
+            src.stop(start + dur * 0.9);
+          }
+
+          // 2. Cascade of 20 to 26 micro-clatters (tapering off)
+          const hits = 22 + Math.floor(Math.random() * 6);
+          for (let i = 0; i < hits; i++) {
+            const progress = Math.pow(i / hits, 1.55);
+            const timeOffset = start + (progress * dur * 0.84) + (Math.random() * 0.015);
+            const vol = (1 - (i / hits) * 0.7) * (0.6 + Math.random() * 0.4);
+            const pan = (Math.random() * 1.5) - 0.75;
+            this.scheduleSubImpact(timeOffset, vol, pan);
+          }
+
+          // 3. Crisp final settling clatters
+          this.scheduleSubImpact(start + dur * 0.80 + Math.random() * 0.03, 0.45, -0.3);
+          this.scheduleSubImpact(start + dur * 0.93 + Math.random() * 0.03, 0.35, 0.25);
+        }
+
+        scheduleSubImpact(time, vol, pan) {
+          if (!this.ctx) return;
+
+          const osc = this.ctx.createOscillator();
+          const oscGain = this.ctx.createGain();
+          const freq = 480 + Math.random() * 450;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, time);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.35, time + 0.03);
+
+          oscGain.gain.setValueAtTime(vol * 0.42, time);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+
+          let noiseNode = null;
+          let noiseGain = null;
+          if (this.noiseBuffer) {
+            noiseNode = this.ctx.createBufferSource();
+            noiseNode.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1000 + Math.random() * 450, time);
+            filter.Q.setValueAtTime(2.0, time);
+
+            noiseGain = this.ctx.createGain();
+            noiseGain.gain.setValueAtTime(vol * 0.48, time);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.026);
+
+            noiseNode.connect(filter);
+            filter.connect(noiseGain);
+          }
+
+          const sub = this.ctx.createOscillator();
+          const subGain = this.ctx.createGain();
+          sub.type = 'sine';
+          sub.frequency.setValueAtTime(115 + Math.random() * 25, time);
+          sub.frequency.exponentialRampToValueAtTime(40, time + 0.038);
+
+          subGain.gain.setValueAtTime(vol * 0.32, time);
+          subGain.gain.exponentialRampToValueAtTime(0.001, time + 0.038);
+
+          let panner = null;
+          if (this.ctx.createStereoPanner) {
+            panner = this.ctx.createStereoPanner();
+            panner.pan.setValueAtTime(pan, time);
+          }
+
+          const target = panner || this.masterGain;
+          osc.connect(oscGain);
+          oscGain.connect(target);
+
+          if (noiseNode && noiseGain) {
+            noiseGain.connect(target);
+            noiseNode.start(time);
+            noiseNode.stop(time + 0.03);
+          }
+
+          sub.connect(subGain);
+          subGain.connect(target);
+
+          if (panner) panner.connect(this.masterGain);
+
+          osc.start(time);
+          osc.stop(time + 0.035);
+          sub.start(time);
+          sub.stop(time + 0.04);
+        }
+      }
+
+      const audio = new CrunchyAudioEngine();
+
+
+      // ======================================================================
+      // 2. THREE.JS 3D TETRAHEDRAL DICE SHAKER SIMULATION
+      // Authentic Royal Game of Ur Dice Geometry & Physics
+      // ======================================================================
+
+      const canvas = document.getElementById('webgl-canvas');
+      const diceContainer = document.getElementById('dice-container');
+
+      let scene, camera, renderer;
+      let trayFloorMesh, trayGroup;
+      let diceObjects = [];
+      let isRolling = false;
+      let rollStartTime = 0;
+      let rollDuration = 1200; // ms
+      let rollResults = [0, 0, 0, 0];
+      let rollHistory = [];
+      let cameraPerspectiveMode = false;
+
+      // Camera orbit/drag controls
+      let cameraAngleYaw = 0;
+      let cameraAnglePitch = 0.32;
+      let cameraDistance = 13.5;
+      let lookAtTarget = new THREE.Vector3(0, 0.2, 0.6);
+      let isDragging = false;
+      let dragStartX = 0, dragStartY = 0;
+      let dragHasMoved = false;
+
+      // Physics boundary constants
+      const TRAY_WIDTH = 6.8;
+      const TRAY_LENGTH = 8.8;
+      const FLOOR_Y = 0.0;
+      const DIE_RADIUS = 0.88;
+
+      // Regular tetrahedron vertex coordinates (normalized)
+      // V0, V1, V2, V3
+      const TETRA_VERTICES = [
+        new THREE.Vector3( 1,  1,  1).normalize(),
+        new THREE.Vector3( 1, -1, -1).normalize(),
+        new THREE.Vector3(-1,  1, -1).normalize(),
+        new THREE.Vector3(-1, -1,  1).normalize()
+      ];
+
+      // In the Royal Game of Ur:
+      // Exactly 2 vertices are MARKED (inlaid rosettes), 2 are UNMARKED (plain).
+      // V0 & V1 are MARKED (scores 1 when apex points UP).
+      // V2 & V3 are UNMARKED (scores 0 when apex points UP).
+      const VERTEX_MARKED = [true, true, false, false];
+
+      function init3D() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x080c14);
+
+        const aspect = diceContainer.clientWidth / diceContainer.clientHeight;
+        camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+        updateCameraTransform();
+
+        renderer = new THREE.WebGLRenderer({
+          canvas: canvas,
+          antialias: true,
+          powerPreference: 'high-performance'
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(diceContainer.clientWidth, diceContainer.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xdbe6f5, 0.9);
+        scene.add(ambientLight);
+
+        // Warm torchlight / Sun directional light
+        const dirLight = new THREE.DirectionalLight(0xfff1cc, 1.45);
+        dirLight.position.set(5, 13, 6);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 25;
+        dirLight.shadow.camera.left = -6;
+        dirLight.shadow.camera.right = 6;
+        dirLight.shadow.camera.top = 7;
+        dirLight.shadow.camera.bottom = -7;
+        dirLight.shadow.bias = -0.001;
+        scene.add(dirLight);
+
+        // Secondary lapis lazuli fill light
+        const fillLight = new THREE.DirectionalLight(0x4080c0, 0.65);
+        fillLight.position.set(-6, 8, -5);
+        scene.add(fillLight);
+
+        // Center warm glow
+        const centerPoint = new THREE.PointLight(0xf5c842, 0.9, 14);
+        centerPoint.position.set(0, 3.8, 0);
+        scene.add(centerPoint);
+
+        createTray();
+        createDice();
+
+        // Pointer / touch orbit & drag handling
+        setupPointerControls();
+
+        window.addEventListener('resize', onWindowResize);
+        requestAnimationFrame(animate);
+        // Refit after layout paints (HUD height may settle)
+        requestAnimationFrame(() => {
+          fitCameraToBoard();
+          updateCameraTransform();
+        });
+      }
+
+      function getBoardViewportInsets() {
+        const containerRect = diceContainer.getBoundingClientRect();
+        const containerHeight = Math.max(containerRect.height, 1);
+        const hud = document.querySelector('.top-hud');
+        const buttonSection = document.querySelector('.button-section');
+
+        const hudBottom = hud
+          ? Math.max(0, hud.getBoundingClientRect().bottom - containerRect.top)
+          : 0;
+        const buttonTop = buttonSection
+          ? buttonSection.getBoundingClientRect().top - containerRect.top
+          : containerHeight;
+
+        const gapHeight = Math.max(0, buttonTop - hudBottom);
+        const gapMidY = hudBottom + gapHeight * 0.5;
+        const topFraction = hudBottom / containerHeight;
+        const bottomFraction = Math.max(0, containerHeight - buttonTop) / containerHeight;
+        const visibleFraction = Math.max(0.35, gapHeight / containerHeight);
+
+        return {
+          topFraction,
+          bottomFraction,
+          visibleFraction,
+          gapMidY,
+          hudBottom,
+          buttonTop,
+          gapHeight,
+          containerHeight
+        };
+      }
+
+      function projectTrayCenterToScreenY() {
+        if (!camera || !trayGroup || !diceContainer) return null;
+        const height = diceContainer.clientHeight;
+        if (height <= 0) return null;
+
+        const center = new THREE.Box3().setFromObject(trayGroup).getCenter(new THREE.Vector3());
+        center.project(camera);
+        return (1 - center.y) * 0.5 * height;
+      }
+
+      function applyCameraViewOffset() {
+        if (!camera || !trayGroup || !diceContainer) return;
+
+        const width = diceContainer.clientWidth;
+        const height = diceContainer.clientHeight;
+        if (width <= 0 || height <= 0) return;
+
+        const { gapMidY } = getBoardViewportInsets();
+        const offsetY = height * 0.5 - gapMidY;
+
+        camera.setViewOffset(width, height, 0, offsetY, width, height);
+        camera.updateProjectionMatrix();
+
+        camera.updateMatrixWorld(true);
+        const projectedY = projectTrayCenterToScreenY();
+        if (projectedY === null) return;
+
+        const residual = gapMidY - projectedY;
+        if (Math.abs(residual) > 0.5) {
+          camera.setViewOffset(width, height, 0, offsetY + residual, width, height);
+          camera.updateProjectionMatrix();
+        }
+      }
+
+      function fitCameraToBoard() {
+        if (!camera || !trayGroup || !diceContainer) return;
+
+        const insets = getBoardViewportInsets();
+        const box = new THREE.Box3().setFromObject(trayGroup);
+        const sphere = box.getBoundingSphere(new THREE.Sphere());
+        const radius = sphere.radius * 1.14;
+
+        const vFov = (camera.fov * Math.PI) / 180;
+        const aspect = camera.aspect;
+        const effectiveVFov = 2 * Math.atan(Math.tan(vFov / 2) * insets.visibleFraction);
+        const effectiveAspect = aspect * insets.visibleFraction;
+
+        const distForHeight = radius / Math.sin(effectiveVFov / 2);
+        const distForWidth = radius / Math.sin(Math.atan(Math.tan(vFov / 2) * effectiveAspect));
+        let fitDistance = Math.max(distForHeight, distForWidth);
+
+        const pitch = cameraPerspectiveMode ? 0.7 : cameraAnglePitch;
+        fitDistance /= Math.cos(pitch * 0.82);
+
+        const minDist = cameraPerspectiveMode ? 12.5 : 14.0;
+        const maxDist = cameraPerspectiveMode ? 19.0 : 21.0;
+        cameraDistance = Math.max(minDist, Math.min(maxDist, fitDistance));
+
+        const center = sphere.center;
+        lookAtTarget.set(center.x, center.y + 0.12, center.z);
+      }
+
+      function updateCameraTransform() {
+        const y = cameraDistance * Math.sin(cameraAnglePitch);
+        const r = cameraDistance * Math.cos(cameraAnglePitch);
+        const x = r * Math.sin(cameraAngleYaw);
+        const z = r * Math.cos(cameraAngleYaw);
+        camera.position.set(x, y, z);
+        camera.lookAt(lookAtTarget);
+        applyCameraViewOffset();
+      }
+
+      function setupPointerControls() {
+        canvas.addEventListener('pointerdown', (e) => {
+          isDragging = true;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          dragHasMoved = false;
+          audio.init();
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          if (!isDragging) return;
+          const dx = e.clientX - dragStartX;
+          const dy = e.clientY - dragStartY;
+          if (Math.hypot(dx, dy) > 6) {
+            dragHasMoved = true;
+          }
+          cameraAngleYaw -= dx * 0.005;
+          cameraAnglePitch = Math.max(0.25, Math.min(1.4, cameraAnglePitch + dy * 0.005));
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          updateCameraTransform();
+        });
+
+        window.addEventListener('pointerup', () => {
+          if (isDragging) {
+            isDragging = false;
+            // If it was just a quick tap without drag, trigger roll!
+            if (!dragHasMoved) {
+              rollDice();
+            }
+          }
+        });
+      }
+
+      // Procedural texture for the Mesopotamian Ur Board Tray
+      function createTrayTexture() {
+        const c = document.createElement('canvas');
+        c.width = 1024;
+        c.height = 1024;
+        const ctx = c.getContext('2d');
+
+        // Deep lapis lazuli background with starry texture
+        const grad = ctx.createRadialGradient(512, 512, 120, 512, 512, 700);
+        grad.addColorStop(0, '#1a375e');
+        grad.addColorStop(0.65, '#0e243c');
+        grad.addColorStop(1, '#061320');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 1024, 1024);
+
+        // Gold inlay border
+        ctx.strokeStyle = '#f5c842';
+        ctx.lineWidth = 12;
+        ctx.strokeRect(30, 30, 964, 964);
+
+        ctx.strokeStyle = '#b88616';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(50, 50, 924, 924);
+
+        // Ancient Ur 8-pointed rosettes in corners
+        const drawRosette = (x, y, r) => {
+          ctx.save();
+          ctx.translate(x, y);
+          for (let i = 0; i < 8; i++) {
+            ctx.rotate(Math.PI / 4);
+            ctx.beginPath();
+            ctx.ellipse(0, r * 0.5, r * 0.22, r * 0.5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#f5c842';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.25, 0, Math.PI * 2);
+          ctx.fillStyle = '#a82e1a'; // Carnelian center
+          ctx.fill();
+          ctx.strokeStyle = '#ffd700';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+        };
+
+        drawRosette(110, 110, 42);
+        drawRosette(914, 110, 42);
+        drawRosette(110, 914, 42);
+        drawRosette(914, 914, 42);
+
+        // Center emblem
+        drawRosette(512, 512, 80);
+
+        // Decorative grid lines
+        ctx.strokeStyle = 'rgba(245, 200, 66, 0.12)';
+        ctx.lineWidth = 2;
+        for (let i = 160; i < 900; i += 120) {
+          ctx.beginPath();
+          ctx.moveTo(i, 80);
+          ctx.lineTo(i, 944);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(80, i);
+          ctx.lineTo(944, i);
+          ctx.stroke();
+        }
+
+        const texture = new THREE.CanvasTexture(c);
+        texture.anisotropy = 4;
+        return texture;
+      }
+
+      function createTray() {
+        trayGroup = new THREE.Group();
+
+        // Floor
+        const floorGeo = new THREE.PlaneGeometry(TRAY_WIDTH, TRAY_LENGTH);
+        const floorMat = new THREE.MeshStandardMaterial({
+          map: createTrayTexture(),
+          roughness: 0.38,
+          metalness: 0.25
+        });
+        trayFloorMesh = new THREE.Mesh(floorGeo, floorMat);
+        trayFloorMesh.rotation.x = -Math.PI / 2;
+        trayFloorMesh.position.y = FLOOR_Y;
+        trayFloorMesh.receiveShadow = true;
+        trayGroup.add(trayFloorMesh);
+
+        // Raised Carved Wood Rim / Border
+        const rimMaterial = new THREE.MeshStandardMaterial({
+          color: 0x361c10, // Antiqued cedar
+          roughness: 0.65,
+          metalness: 0.15
+        });
+
+        const goldTrimMat = new THREE.MeshStandardMaterial({
+          color: 0xf5c842,
+          roughness: 0.25,
+          metalness: 0.85
+        });
+
+        const wallHeight = 0.85;
+        const wallThickness = 0.45;
+
+        const addWall = (w, h, d, x, y, z) => {
+          const geo = new THREE.BoxGeometry(w, h, d);
+          const mesh = new THREE.Mesh(geo, rimMaterial);
+          mesh.position.set(x, y, z);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          trayGroup.add(mesh);
+
+          // Top gold lip
+          const lipGeo = new THREE.BoxGeometry(w * 0.98, 0.08, d * 0.98);
+          const lipMesh = new THREE.Mesh(lipGeo, goldTrimMat);
+          lipMesh.position.set(x, y + h / 2 + 0.04, z);
+          trayGroup.add(lipMesh);
+        };
+
+        // Left & Right walls
+        addWall(wallThickness, wallHeight, TRAY_LENGTH + wallThickness * 2, -TRAY_WIDTH / 2 - wallThickness / 2, wallHeight / 2, 0);
+        addWall(wallThickness, wallHeight, TRAY_LENGTH + wallThickness * 2, TRAY_WIDTH / 2 + wallThickness / 2, wallHeight / 2, 0);
+
+        // Top & Bottom walls
+        addWall(TRAY_WIDTH, wallHeight, wallThickness, 0, wallHeight / 2, -TRAY_LENGTH / 2 - wallThickness / 2);
+        addWall(TRAY_WIDTH, wallHeight, wallThickness, 0, wallHeight / 2, TRAY_LENGTH / 2 + wallThickness / 2);
+
+        scene.add(trayGroup);
+      }
+
+      // Helper to generate a mini-tetrahedron tip flush with the parent pyramid
+      function createMiniPyramid(vertexIdx, f = 0.35) {
+        const Vi = TETRA_VERTICES[vertexIdx].clone().multiplyScalar(DIE_RADIUS);
+        const others = [];
+        for (let j = 0; j < 4; j++) {
+          if (j !== vertexIdx) {
+            others.push(TETRA_VERTICES[j].clone().multiplyScalar(DIE_RADIUS));
+          }
+        }
+
+        // Apex (A) at parent vertex, and 3 base points (B, C, D) along parent edges
+        const A = Vi.clone();
+        const B = Vi.clone().add(others[0].clone().sub(Vi).multiplyScalar(f));
+        const C = Vi.clone().add(others[1].clone().sub(Vi).multiplyScalar(f));
+        const D = Vi.clone().add(others[2].clone().sub(Vi).multiplyScalar(f));
+
+        // 4 triangular faces: 3 outer faces flush with parent faces, 1 internal base face
+        const faces = [
+          { tri: [A, B, C], opp: D },
+          { tri: [A, C, D], opp: B },
+          { tri: [A, D, B], opp: C },
+          { tri: [B, C, D], opp: A }
+        ];
+
+        const positions = [];
+        faces.forEach(({ tri, opp }) => {
+          let [p1, p2, p3] = tri;
+          const norm = new THREE.Vector3().crossVectors(
+            p2.clone().sub(p1),
+            p3.clone().sub(p1)
+          );
+          const mid = p1.clone().add(p2).add(p3).divideScalar(3);
+          const dir = mid.clone().sub(opp);
+          if (norm.dot(dir) < 0) {
+            [p2, p3] = [p3, p2];
+          }
+          positions.push(p1.x, p1.y, p1.z);
+          positions.push(p2.x, p2.y, p2.z);
+          positions.push(p3.x, p3.y, p3.z);
+        });
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.computeVertexNormals();
+
+        return { geo, A, B, C, D };
+      }
+
+      // Construct a single authentic tetrahedral die with flush white mini-pyramid tips
+      function createUrTetrahedron() {
+        const dieGroup = new THREE.Group();
+
+        // 1. Regular Tetrahedron base geometry (dark lapis lazuli stone body)
+        const baseGeo = new THREE.TetrahedronGeometry(DIE_RADIUS, 0);
+
+        const stoneMat = new THREE.MeshStandardMaterial({
+          color: 0x182c44,
+          roughness: 0.42,
+          metalness: 0.35,
+          flatShading: true
+        });
+
+        const baseMesh = new THREE.Mesh(baseGeo, stoneMat);
+        baseMesh.castShadow = true;
+        baseMesh.receiveShadow = true;
+        dieGroup.add(baseMesh);
+
+        // Gold carved bevel edges on parent body
+        const edgesGeo = new THREE.EdgesGeometry(baseGeo);
+        const edgeLine = new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({
+          color: 0xf5c842,
+          linewidth: 1.5,
+          transparent: true,
+          opacity: 0.5
+        }));
+        dieGroup.add(edgeLine);
+
+        // 2. White Mini-Pyramid Tips:
+        // Exactly 2 of the 4 vertices (V0 and V1) are MARKED with flush white mini-pyramids.
+        // The other 2 vertices (V2 and V3) are UNMARKED (remain flush dark stone body - NO balls).
+        const whiteTipMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.25,
+          metalness: 0.15,
+          flatShading: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2
+        });
+
+        for (let i = 0; i < 4; i++) {
+          if (VERTEX_MARKED[i]) {
+            const { geo, B, C, D } = createMiniPyramid(i, 0.34);
+            const tipMesh = new THREE.Mesh(geo, whiteTipMat);
+            tipMesh.castShadow = true;
+            tipMesh.receiveShadow = true;
+            dieGroup.add(tipMesh);
+
+            // Subtle gold inlay seam line where the white mini-pyramid meets the dark body
+            const seamGeo = new THREE.BufferGeometry().setFromPoints([B, C, D, B]);
+            const seamLine = new THREE.Line(seamGeo, new THREE.LineBasicMaterial({
+              color: 0xf5c842,
+              linewidth: 2,
+              transparent: true,
+              opacity: 0.8
+            }));
+            dieGroup.add(seamLine);
+          }
+        }
+
+        return {
+          group: dieGroup
+        };
+      }
+
+      function createDice() {
+        diceObjects = [];
+        const startPositions = [
+          new THREE.Vector3(-1.5, 0.7, -1.6),
+          new THREE.Vector3( 1.5, 0.7, -1.6),
+          new THREE.Vector3(-1.5, 0.7,  1.4),
+          new THREE.Vector3( 1.5, 0.7,  1.4)
+        ];
+
+        for (let i = 0; i < 4; i++) {
+          const die = createUrTetrahedron();
+          die.group.position.copy(startPositions[i]);
+          
+          const targetVertexIdx = (i % 2 === 0) ? 0 : 2;
+          alignDieToVertex(die.group, targetVertexIdx, Math.random() * Math.PI * 2);
+
+          scene.add(die.group);
+
+          diceObjects.push({
+            id: i,
+            group: die.group,
+            velocity: new THREE.Vector3(0, 0, 0),
+            angularVelocity: new THREE.Vector3(0, 0, 0),
+            targetQuaternion: die.group.quaternion.clone(),
+            restingHeight: 0.48,
+            outcomeScore: 0,
+            chosenVertex: 0
+          });
+        }
+      }
+
+      function alignDieToVertex(group, vertexIdx, yawAngle = 0) {
+        const v = TETRA_VERTICES[vertexIdx].clone();
+        const qAlign = new THREE.Quaternion().setFromUnitVectors(v, new THREE.Vector3(0, 1, 0));
+        const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawAngle);
+        qYaw.multiply(qAlign);
+        group.quaternion.copy(qYaw);
+      }
+
+      function onWindowResize() {
+        if (!camera || !renderer || !diceContainer) return;
+        const width = diceContainer.clientWidth;
+        const height = diceContainer.clientHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+        fitCameraToBoard();
+        updateCameraTransform();
+      }
+
+
+      // ======================================================================
+      // 3. ROLL MECHANICS & PHYSICS SIMULATION
+      // Authentic Royal Game of Ur Probabilities (50% per die)
+      // ======================================================================
+
+      function rollDice() {
+        if (isRolling) return;
+        isRolling = true;
+
+        audio.init();
+        audio.playFullCrunchyRoll(rollDuration);
+
+        // Update UI state
+        const rollBtn = document.getElementById('roll-button');
+        rollBtn.classList.add('rolling', 'pressed');
+        document.getElementById('button-label').textContent = 'ROLLING...';
+        document.getElementById('score-outcome').textContent = 'SHAKING...';
+        document.getElementById('score-total').textContent = '...';
+
+        for (let i = 0; i < 4; i++) {
+          const chip = document.getElementById('chip-' + i);
+          chip.className = 'die-chip';
+          chip.querySelector('.die-val').textContent = '...';
+        }
+
+        rollStartTime = performance.now();
+
+        // 1. Determine authentic Ur score outcome
+        // Each die independently has a 50% chance of 1, 50% of 0.
+        rollResults = [];
+        let totalScore = 0;
+
+        for (let i = 0; i < 4; i++) {
+          const score = Math.random() < 0.5 ? 1 : 0;
+          rollResults.push(score);
+          totalScore += score;
+
+          const die = diceObjects[i];
+          die.outcomeScore = score;
+
+          // If score is 1: pick V0 or V1 (marked)
+          // If score is 0: pick V2 or V3 (unmarked)
+          const chosenVertex = score === 1 ? (Math.random() < 0.5 ? 0 : 1) : (Math.random() < 0.5 ? 2 : 3);
+          die.chosenVertex = chosenVertex;
+
+          // Target resting orientation (face flat on table, apex up)
+          const yaw = Math.random() * Math.PI * 2;
+          const qAlign = new THREE.Quaternion().setFromUnitVectors(TETRA_VERTICES[chosenVertex], new THREE.Vector3(0, 1, 0));
+          const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+          qYaw.multiply(qAlign);
+          die.targetQuaternion.copy(qYaw);
+
+          // Launch from current resting spot with physical impulse
+          const launchAngle = Math.random() * Math.PI * 2;
+          const launchPower = 4.5 + Math.random() * 4.0;
+          die.velocity.set(
+            Math.cos(launchAngle) * launchPower,
+            7.0 + Math.random() * 4.5,
+            Math.sin(launchAngle) * launchPower
+          );
+
+          // Tumbling angular spin
+          die.angularVelocity.set(
+            (Math.random() - 0.5) * 36.0,
+            (Math.random() - 0.5) * 36.0,
+            (Math.random() - 0.5) * 36.0
+          );
+        }
+
+        setTimeout(() => {
+          rollBtn.classList.remove('pressed');
+        }, 180);
+      }
+
+      function clampDieToTray(die, boundX, boundZ) {
+        die.group.position.x = THREE.MathUtils.clamp(die.group.position.x, -boundX, boundX);
+        die.group.position.z = THREE.MathUtils.clamp(die.group.position.z, -boundZ, boundZ);
+      }
+
+      function updateDicePhysics(deltaTime) {
+        if (!isRolling) return;
+
+        const elapsed = performance.now() - rollStartTime;
+        const progress = Math.min(elapsed / rollDuration, 1.0);
+
+        const boundX = (TRAY_WIDTH / 2) - DIE_RADIUS * 0.9;
+        const boundZ = (TRAY_LENGTH / 2) - DIE_RADIUS * 0.9;
+
+        for (let i = 0; i < 4; i++) {
+          const die = diceObjects[i];
+
+          if (progress < 0.72) {
+            // Free flight and bouncing phase
+            die.velocity.y -= 28.0 * deltaTime; // Gravity
+
+            die.group.position.x += die.velocity.x * deltaTime;
+            die.group.position.y += die.velocity.y * deltaTime;
+            die.group.position.z += die.velocity.z * deltaTime;
+
+            // Apply angular velocity to quaternion
+            const deltaRot = new THREE.Quaternion();
+            const rotAxis = die.angularVelocity.clone().normalize();
+            const rotAngle = die.angularVelocity.length() * deltaTime;
+            if (rotAngle > 0.0001) {
+              deltaRot.setFromAxisAngle(rotAxis, rotAngle);
+              die.group.quaternion.multiplyQuaternions(deltaRot, die.group.quaternion);
+            }
+
+            // Damping
+            die.angularVelocity.multiplyScalar(Math.pow(0.85, deltaTime * 10));
+
+            // Floor collision
+            if (die.group.position.y <= die.restingHeight) {
+              die.group.position.y = die.restingHeight;
+              if (Math.abs(die.velocity.y) > 0.8) {
+                const impactVel = Math.abs(die.velocity.y) / 8.0;
+                audio.playImpact(impactVel, die.group.position.x / boundX);
+                die.velocity.y = -die.velocity.y * 0.48;
+                die.velocity.x *= 0.75;
+                die.velocity.z *= 0.75;
+              } else {
+                die.velocity.y = 0;
+              }
+            }
+
+            // Tray walls collision
+            if (Math.abs(die.group.position.x) > boundX) {
+              die.group.position.x = Math.sign(die.group.position.x) * boundX;
+              die.velocity.x = -die.velocity.x * 0.55;
+              audio.playImpact(0.4, die.group.position.x / boundX);
+            }
+            if (Math.abs(die.group.position.z) > boundZ) {
+              die.group.position.z = Math.sign(die.group.position.z) * boundZ;
+              die.velocity.z = -die.velocity.z * 0.55;
+              audio.playImpact(0.4, die.group.position.x / boundX);
+            }
+          } else {
+            // Settle: keep landed X/Z, ease Y to table, slerp to outcome face
+            const settleProgress = (progress - 0.72) / 0.28;
+            const ease = easeOutCubic(settleProgress);
+
+            die.velocity.set(0, 0, 0);
+            die.angularVelocity.multiplyScalar(Math.pow(0.7, deltaTime * 12));
+
+            die.group.position.y = THREE.MathUtils.lerp(
+              die.group.position.y,
+              die.restingHeight,
+              ease * 0.35
+            );
+            die.group.quaternion.slerp(die.targetQuaternion, ease * 0.28);
+          }
+        }
+
+        // Inter-die soft separation (gentle nudge if overlapping)
+        const separating = progress >= 0.72;
+        for (let i = 0; i < 4; i++) {
+          for (let j = i + 1; j < 4; j++) {
+            const d1 = diceObjects[i];
+            const d2 = diceObjects[j];
+            const dx = d1.group.position.x - d2.group.position.x;
+            const dz = d1.group.position.z - d2.group.position.z;
+            const distXZ = Math.sqrt(dx * dx + dz * dz);
+            const minDist = DIE_RADIUS * 1.65;
+            if (distXZ < minDist && distXZ > 0.001) {
+              const normalX = dx / distXZ;
+              const normalZ = dz / distXZ;
+              const overlap = (minDist - distXZ) * (separating ? 0.35 : 0.5);
+              d1.group.position.x += normalX * overlap;
+              d1.group.position.z += normalZ * overlap;
+              d2.group.position.x -= normalX * overlap;
+              d2.group.position.z -= normalZ * overlap;
+
+              if (!separating && progress < 0.6) {
+                d1.velocity.x += normalX * 1.8;
+                d1.velocity.z += normalZ * 1.8;
+                d2.velocity.x -= normalX * 1.8;
+                d2.velocity.z -= normalZ * 1.8;
+                audio.playImpact(0.35, d1.group.position.x / boundX);
+              }
+            }
+          }
+        }
+
+        // Keep dice within tray bounds after separation
+        for (let i = 0; i < 4; i++) {
+          clampDieToTray(diceObjects[i], boundX, boundZ);
+        }
+
+        // Roll completion check
+        if (progress >= 1.0) {
+          finishRoll();
+        }
+      }
+
+      function easeOutCubic(x) {
+        return 1 - Math.pow(1 - x, 3);
+      }
+
+      function finishRoll() {
+        isRolling = false;
+
+        // Finalize resting orientation only — keep landed X/Z positions
+        const boundX = (TRAY_WIDTH / 2) - DIE_RADIUS * 0.9;
+        const boundZ = (TRAY_LENGTH / 2) - DIE_RADIUS * 0.9;
+        for (let i = 0; i < 4; i++) {
+          const die = diceObjects[i];
+          die.group.position.y = die.restingHeight;
+          clampDieToTray(die, boundX, boundZ);
+          die.group.quaternion.copy(die.targetQuaternion);
+          die.velocity.set(0, 0, 0);
+          die.angularVelocity.set(0, 0, 0);
+        }
+
+        const rollBtn = document.getElementById('roll-button');
+        rollBtn.classList.remove('rolling');
+        document.getElementById('button-label').textContent = 'ROLL DICE';
+
+        // Calculate total score
+        const total = rollResults.reduce((a, b) => a + b, 0);
+
+        // Update score display
+        const scoreEl = document.getElementById('score-total');
+        scoreEl.textContent = total;
+        scoreEl.classList.remove('pop');
+        void scoreEl.offsetWidth; // trigger reflow
+        scoreEl.classList.add('pop');
+
+        // Update outcome description
+        const outcomeEl = document.getElementById('score-outcome');
+        if (total === 0) {
+          outcomeEl.textContent = 'NO MOVES (PASS)';
+          outcomeEl.style.color = '#94a3b8';
+        } else if (total === 4) {
+          outcomeEl.textContent = '★ MAX ROLL! 4 MOVES';
+          outcomeEl.style.color = '#ffd700';
+        } else if (total === 1) {
+          outcomeEl.textContent = '1 MOVE';
+          outcomeEl.style.color = '#38bdf8';
+        } else {
+          outcomeEl.textContent = `${total} MOVES`;
+          outcomeEl.style.color = '#f5c842';
+        }
+
+        // Update individual dice breakdown chips
+        for (let i = 0; i < 4; i++) {
+          const chip = document.getElementById('chip-' + i);
+          const score = rollResults[i];
+          chip.className = 'die-chip ' + (score === 1 ? 'hit' : 'miss');
+          chip.querySelector('.die-val').textContent = score;
+        }
+
+        addHistory(total);
+
+        // Haptic feedback
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate(total === 4 ? [30, 40, 50, 40, 80] : 30);
+          } catch (_) {}
+        }
+      }
+
+      function addHistory(score) {
+        rollHistory.unshift(score);
+        if (rollHistory.length > 7) rollHistory.pop();
+
+        const historyBar = document.getElementById('history-bar');
+        const historyDots = document.getElementById('history-dots');
+        historyBar.style.display = 'flex';
+        historyDots.innerHTML = '';
+
+        rollHistory.forEach(s => {
+          const dot = document.createElement('div');
+          dot.className = `history-dot score-${s}`;
+          dot.textContent = s;
+          historyDots.appendChild(dot);
+        });
+
+        requestAnimationFrame(() => {
+          fitCameraToBoard();
+          updateCameraTransform();
+        });
+      }
+
+
+      // ======================================================================
+      // 4. ANIMATION LOOP
+      // ======================================================================
+
+      let lastTime = performance.now();
+
+      function animate(time) {
+        requestAnimationFrame(animate);
+
+        const delta = Math.min((time - lastTime) / 1000, 0.1);
+        lastTime = time;
+
+        updateDicePhysics(delta);
+
+        // Idle breathing motion
+        if (!isRolling) {
+          const idleT = time * 0.001;
+          for (let i = 0; i < 4; i++) {
+            const die = diceObjects[i];
+            die.group.position.y = die.restingHeight + Math.sin(idleT + i * 1.5) * 0.015;
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+
+      // ======================================================================
+      // 5. MOBILE USER INTERACTIONS & EVENT HANDLERS
+      // ======================================================================
+
+      const rollBtn = document.getElementById('roll-button');
+      const muteBtn = document.getElementById('mute-btn');
+      const cameraBtn = document.getElementById('camera-btn');
+      const rulesBtn = document.getElementById('rules-btn');
+      const rulesModal = document.getElementById('rules-modal');
+      const modalClose = document.getElementById('modal-close');
+      const toast = document.getElementById('toast');
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => {
+          toast.classList.remove('show');
+        }, 1600);
+      }
+
+      // Tap giant button to roll
+      rollBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        rollDice();
+      });
+
+      // Camera view toggle
+      cameraBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cameraPerspectiveMode = !cameraPerspectiveMode;
+        cameraAngleYaw = 0;
+        cameraAnglePitch = cameraPerspectiveMode ? 0.7 : 0.32;
+        fitCameraToBoard();
+        updateCameraTransform();
+        showToast(cameraPerspectiveMode ? 'Perspective View' : 'Top View');
+      });
+
+      // Sound mute toggle
+      function updateMuteIcons() {
+        const isMuted = audio.muted;
+        document.getElementById('sound-icon-on').style.display = isMuted ? 'none' : 'block';
+        document.getElementById('sound-icon-off').style.display = isMuted ? 'block' : 'none';
+      }
+      updateMuteIcons();
+
+      muteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const muted = audio.toggleMute();
+        updateMuteIcons();
+        showToast(muted ? 'Sound Muted' : 'Crunchy Sound ON');
+      });
+
+      // Rules modal
+      rulesBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        rulesModal.classList.add('open');
+      });
+
+      modalClose.addEventListener('click', () => {
+        rulesModal.classList.remove('open');
+      });
+
+      rulesModal.addEventListener('click', (e) => {
+        if (e.target === rulesModal) {
+          rulesModal.classList.remove('open');
+        }
+      });
+
+      // Shake Detection (Mobile DeviceMotionEvent)
+      let lastShakeTime = 0;
+      let lastX = 0, lastY = 0, lastZ = 0;
+      const SHAKE_THRESHOLD = 15.0;
+
+      function handleMotion(e) {
+        const current = e.accelerationIncludingGravity;
+        if (!current) return;
+
+        const deltaX = Math.abs(current.x - lastX);
+        const deltaY = Math.abs(current.y - lastY);
+        const deltaZ = Math.abs(current.z - lastZ);
+
+        if ((deltaX + deltaY + deltaZ) > SHAKE_THRESHOLD) {
+          const now = Date.now();
+          if (now - lastShakeTime > 1200) {
+            lastShakeTime = now;
+            rollDice();
+          }
+        }
+
+        lastX = current.x;
+        lastY = current.y;
+        lastZ = current.z;
+      }
+
+      if (window.DeviceMotionEvent) {
+        window.addEventListener('devicemotion', handleMotion, false);
+      }
+
+      // iOS 13+ Motion Permission Request on first user tap
+      document.body.addEventListener('touchstart', function requestPerm() {
+        audio.init();
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission().then(state => {
+            if (state === 'granted') {
+              window.addEventListener('devicemotion', handleMotion, false);
+            }
+          }).catch(console.warn);
+        }
+        document.body.removeEventListener('touchstart', requestPerm);
+      }, { once: true });
+
+      // Expose rollDice on window for testing and external trigger
+      window.rollDice = rollDice;
+      window.getDicePositions = () => diceObjects.map((d, i) => ({
+        i,
+        x: d.group.position.x,
+        y: d.group.position.y,
+        z: d.group.position.z,
+      }));
+      window.isRolling = () => isRolling;
+
+      // Initialize 3D Engine on load or immediately if already ready
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', init3D);
+      } else {
+        init3D();
+      }
+
+    })();
+  </script>
+</body>
+</html>
